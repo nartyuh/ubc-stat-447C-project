@@ -1,1 +1,1 @@
-# ubc-stat-447C-project
+# UBC STAT 447C Final Project
