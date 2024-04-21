@@ -15,6 +15,8 @@ library(LaplacesDemon)
 library(reshape2)
 library(ggplot2)
 library(pROC)
+library(broom)
+library(regclass)
 ```
 
 ## Introduction
@@ -95,8 +97,6 @@ test_data <- df[501:569,]
 # hist(df$fractal_dimension1, xlab = "fractal dimension", main = "")
 ```
 
-
-
 ## Frequentist logistic regression
 
 ### Naive model with every explanatory variables included
@@ -143,9 +143,6 @@ frequentist.better_reg <-
 
 AIC
 
-
-ROC curve
-
 ```{r, echo=FALSE}
 frequentist.naive_reg.pred <- predict(frequentist.naive_reg, newdata = test_data)
 frequentist.naive_reg.roc_curve <- roc(response = test_data$Diagnosis, 
@@ -161,35 +158,88 @@ frequentist.better_reg.roc_curve <- roc(response = test_data$Diagnosis,
                                        predictor = frequentist.better_reg.pred, quiet = TRUE)
 plot(frequentist.better_reg.roc_curve,
      print.auc=TRUE, col="blue", lwd=3, lty=2,
-     main="ROC Curve of Frequentist naive model")
+     main="ROC Curve of Frequentist better model")
 ```
 
 ### Model diagnostics
 
-residual vs fitted
-normal Q-Q
-Scale-Location
+Influential
 
-AIC
+```{r}
+model.data <- augment(frequentist.better_reg) %>% mutate(index = 1:n()) 
+model.data %>% filter(abs(.std.resid) > 3)
+```
 
-## Bayesian 
+Multicollinearity/VIF
+
+```{r}
+VIF(frequentist.better_reg)
+```
+
+
+## Bayesian logistic regression
+
+Let $\beta_0$ be the intercept parameter and $\beta_1,...\beta_{10}$ be the slope parameters for `radius`, `texture`, `perimeter`, `area`, `smoothness`, `compactness`, `concavity`, `concave_points`, `symmetry`, and `fractal_dimension` correspondingly.
+
+To fit a Bayesian logistic regression to our data, we need to specify our Bayesian model. One of the important tasks when specifying our model is the selection of prior distributions. We often select generic weakly informative priors like $Normal(0,1)$ to perform regression task in Bayesian approach. This choice could work in our case as we are attempting to fit a logistic regression model. However, logistic regression can also become unstable from separation, a problem when the outcome variable separates a predictor variable perfectly. (Bayesian Data Analysis, p. 412) To avoid this problem, Gelman et al. (2008) suggested the Cauchy distribution with center 0 and scale set to 2.5 for the slopes and 10 for the intercept. We will employ this choice of prior to model Bayesian logistic regression. To proceed with approach, it is required that we center and scale our nonbinary variables to have mean 0 and standard deviation 0.5. (Gelman et al., 2008)
+
+```{r, echo=FALSE}
+df$radius1 <- df$radius1 - mean(df$radius1)
+df$radius1 <- df$radius1/sd(df$radius1)/2
+
+df$texture1 <- df$texture1 - mean(df$texture1)
+df$texture1 <- df$texture1/sd(df$texture1)/2
+
+df$perimeter1 <- df$perimeter1 - mean(df$perimeter1)
+df$perimeter1 <- df$perimeter1/sd(df$perimeter1)/2
+
+df$area1 <- df$area1 - mean(df$area1)
+df$area1 <- df$area1/sd(df$area1)/2
+
+df$smoothness1 <- df$smoothness1 - mean(df$smoothness1)
+df$smoothness1 <- df$smoothness1/sd(df$smoothness1)/2
+
+df$compactness1 <- df$compactness1 - mean(df$compactness1)
+df$compactness1 <- df$compactness1/sd(df$compactness1)/2
+
+df$concavity1 <- df$concave_points1 - mean(df$concavity1)
+df$concavity1 <- df$concavity1/sd(df$concavity1)/2
+
+df$concave_points1 <- df$concave_points1 - mean(df$concave_points1)
+df$concave_points1 <- df$concave_points1/sd(df$concave_points1)/2
+
+df$symmetry1 <- df$symmetry1 - mean(df$symmetry1)
+df$symmetry1 <- df$symmetry1/sd(df$symmetry1)/2
+
+df$fractal_dimension1 <- df$fractal_dimension1 - mean(df$fractal_dimension1)
+df$fractal_dimension1 <- df$fractal_dimension1/sd(df$fractal_dimension1)/2
+```
+
+
+### Model with priors for every explanatory variables
+
+\begin{align}
+  \beta_0 & \sim \text{Cauchy}(0, 10) \\
+  \beta_i & \overset{\text{iid}}{\sim} \text{Cauchy}(0, 2.5) & \text{ for } i \in \{1,...,10\} \\
+  y_n|\beta & \sim \text{Bern}(\text{logistic}(\beta_0 + \beta_1x_{n,1} + ... + \beta_{10}x_{n,10})) & n \in \{1,...,n_\text{obs}\}
+\end{align}
 
 waic
 loo
 roc
 
-priot choice?
+prior choice?
   In addition to the problem of collinearity, familiar from linear regression, discrete-data regression can also become unsta- ble from separation, which arises when a linear combination of the predictors is perfectly predictive of the outcome (Bayesian Data Analysis, p. 412)
-  For each coefficient, we assume a Student-t prior distribution with mean 0, degrees-of-freedom parameter ν, and scale s, with ν and s chosen to provide minimal prior information to constrain the coefficients to lie in a reasonable range. We are motivated to consider the t family because flat-tailed distributions allow for robust inference (Bayesian Data Analysis, p. 412)
-  We center our default prior distributions at zero because, in the absence of any problem- specific information, we have no idea if the coefficients β will be positive or negative. We now need to choose default values of the scale s and degrees of freedom ν in the t prior distributions on the coefficients of the rescaled coefficients. (Bayesian Data Analysis, p. 416)
-  If we were to apply the Cauchy prior distribution with center 0 and scale 2.5 to the constant term as well, we would be stating that the success probability is probably between 1% and 99% for units that are average in all the inputs. Depending on the context (for example, epidemiologic modeling of rare conditions), this might not make sense, so as a default we apply a weaker prior distribution—a Cauchy with center 0 and scale 10, which implies that we expect the success probability for an average case to be between 10−9 and 1−10−9. We typically have more information about the intercept than about any particular coefficient and so we can get by with a weaker prior. (Bayesian Data Analysis, p. 416)
+  For each coefficient, we assume a Student-t prior distribution with mean 0, degrees-of-freedom parameter v, and scale s, with v and s chosen to provide minimal prior information to constrain the coefficients to lie in a reasonable range. We are motivated to consider the t family because flat-tailed distributions allow for robust inference (Bayesian Data Analysis, p. 412)
+  We center our default prior distributions at zero because, in the absence of any problem- specific information, we have no idea if the coefficients $\beta$ will be positive or negative. We now need to choose default values of the scale s and degrees of freedom v in the t prior distributions on the coefficients of the rescaled coefficients. (Bayesian Data Analysis, p. 416)
+  If we were to apply the Cauchy prior distribution with center 0 and scale 2.5 to the constant term as well, we would be stating that the success probability is probably between 1% and 99% for units that are average in all the inputs. Depending on the context (for example, epidemiologic modeling of rare conditions), this might not make sense, so as a default we apply a weaker prior distribution - a Cauchy with center 0 and scale 10, which implies that we expect the success probability for an average case to be between 10-9 and 1-10-9. We typically have more information about the intercept than about any particular coefficient and so we can get by with a weaker prior. (Bayesian Data Analysis, p. 416)
   default Cauchy prior distributions with center 0 and scale 10 (for the constant term) and 2.5 (for the coefficient of dose). (Bayesian Data Analysis, p. 418)
 
 
 These prob- lems, which are sometimes summarized by the label ‘overfitting,’ are of much less concern with reasonable prior distributions, such as those applied in hierarchical linear models, as we shall see in Chapter 15. (Bayesian Data Analysis, p. 367)
 
 why colllinearity is bad in Bayesian
-The near-collinearity of the data means that the posterior variance of the regression coefficients would be high in this hypothetical case. Another problem in addition to increased uncertainty conditional on the regression model is that in practice the inferences would be highly sensitive to the model’s assumption that E(y|x, θ) is linear in x. (Bayesian Data Analysis, p. 366)
+The near-collinearity of the data means that the posterior variance of the regression coefficients would be high in this hypothetical case. Another problem in addition to increased uncertainty conditional on the regression model is that in practice the inferences would be highly sensitive to the model’s assumption that $E(y|x, \theta)$ is linear in x. (Bayesian Data Analysis, p. 366)
 
 ## Comparison between models from Frequentist and Bayesian approaches
 
