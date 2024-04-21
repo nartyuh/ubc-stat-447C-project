@@ -14,29 +14,32 @@ library(tidyverse)
 library(LaplacesDemon)
 library(reshape2)
 library(ggplot2)
+library(pROC)
 ```
 
 ## Introduction
 
 ## Goals of the project
 
+### Methodology
+
 ## Data description
 
-```{r, echo=FALSE}
+```{r}
 df <- read.csv("data/breast_cancer_wisconsin.csv")
 df <- as_tibble(df)
 ```
 
 Our response variable is `Diagnosis`, which is categorical. Currently, it's being labelled as **M** (malignant) or **B** (benign). We want to transform it into binary values so that **1** and **0** are equivalent to **M** and **B** respectively.
 
-```{r, echo=FALSE}
+```{r}
 df$Diagnosis <- factor(df$Diagnosis)
 df$Diagnosis <- as.numeric(df$Diagnosis) - 1
 ```
 
 The Breast Cancer Wisconsin (Diagnostic) data set has 30 explanatory variables. However, in fact, they have 10 main features. For each feature, the mean, standard error, and worst/largest  values are recorded. For example, for a single observation in the data, `radius1` is the mean of distances from center to points on the perimeter, `radius2` is the standard error those distances, and `radius3` is largest distance measured. For the sake of length, we are only interested the means.
 
-```{r, echo=FALSE}
+```{r}
 df <- df[, 1:11]
 ```
 
@@ -70,44 +73,138 @@ These ten real-valued features are measurements taken and computed for each cell
   \end{tabular}
 \end{center}
 
-## Exploratory Data Analysis
+We will also divide the dataset into a training dataset of 500 observations and a testing dataset of 69 observations.
 
-```{r, echo=FALSE}
-par(mar = c(4, 3.8, 1, 1))
-par(mfrow = c(2,2))
-hist(df$radius1, xlab = "radius", main = "")
-hist(df$texture1, xlab = "texture", main = "")
-hist(df$perimeter1, xlab = "perimeter", main = "")
-hist(df$area1, xlab = "area", main = "")
-hist(df$smoothness1, xlab = "smoothness", main = "")
-hist(df$compactness1, xlab = "compactness", main = "")
-hist(df$concavity1, xlab = "concavity", main = "")
-hist(df$concave_points1, xlab = "concave points", main = "")
-hist(df$symmetry1, xlab = "symmetry", main = "")
-hist(df$fractal_dimension1, xlab = "fractal dimension", main = "")
+```{r}
+train_data <- df[1:500,]
+test_data <- df[501:569,]
 ```
 
 ```{r, echo=FALSE}
-cor_mat <- round(cor(df[, 2:11]), 2)
+# par(mar = c(4, 3.8, 1, 1))
+# par(mfrow = c(2, 5))
+# hist(df$radius1, xlab = "radius", main = "")
+# hist(df$texture1, xlab = "texture", main = "")
+# hist(df$perimeter1, xlab = "perimeter", main = "")
+# hist(df$area1, xlab = "area", main = "")
+# hist(df$smoothness1, xlab = "smoothness", main = "")
+# hist(df$compactness1, xlab = "compactness", main = "")
+# hist(df$concavity1, xlab = "concavity", main = "")
+# hist(df$concave_points1, xlab = "concave points", main = "")
+# hist(df$symmetry1, xlab = "symmetry", main = "")
+# hist(df$fractal_dimension1, xlab = "fractal dimension", main = "")
+```
+
+
+
+## Frequentist logistic regression
+
+### Naive model with every explanatory variables included
+
+```{r}
+frequentist.naive_reg <- 
+  glm(Diagnosis ~ ., data = train_data, family = binomial(link = "logit"))
+```
+
+### Model with the exlcusion of high correlated explanatory variables
+
+```{r, echo=FALSE}
+cor_mat <- round(cor(train_data[, 2:11]), 2)
 melted_cor_mat <- melt(cor_mat)
-ggplot(data = melted_cor_mat, aes(x=Var1, y=Var2, fill=value)) + 
+ggplot(data = melted_cor_mat, aes(x=Var1, y=Var2, fill=value)) +
   geom_tile() +
   geom_text(aes(Var2, Var1, label = value), color = "black", size = 4) +
   theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1)) +
   xlab("") + ylab("") + ggtitle("Correlation Matrix")
 ```
 
-## Frequentist logistic regression
+Highly correlated variables:
+
+- `radius` and `perimeter`: 1
+- `radius` and `area`: 0.99
+- `radius` and `concave_points`: 0.82
+- `perimeter` and `area`: 0.99
+- `perimeter` and `concavity`: 0.85
+- `perimeter` and `concave_points`: 0.71
+- `area` and `concave_points`: 0.82
+- `compactness` and `concavity`: 0.89
+- `compactness` and `concave_points`: 0.84
+- `concavity` and `concave_points`: 0.92
+
+The possible loss of precision when including unimportant predictors is usually viewed as a relatively small price to pay for the general validity of predictions and inferences about estimands of interest. (Bayesian Data Analysis, p. 367)
 
 ```{r}
-frequentist.naive_reg <- glm(Diagnosis ~ ., data = df, family = binomial(link = "logit"))
+frequentist.better_reg <- 
+  glm(Diagnosis ~ radius1 + texture1 + smoothness1 + concavity1 + symmetry1 + fractal_dimension1, data = train_data, family = binomial(link = "logit"))
 ```
 
+
+### Model comparison
+
+AIC
+
+
+ROC curve
+
+```{r, echo=FALSE}
+frequentist.naive_reg.pred <- predict(frequentist.naive_reg, newdata = test_data)
+frequentist.naive_reg.roc_curve <- roc(response = test_data$Diagnosis, 
+                                       predictor = frequentist.naive_reg.pred, quiet = TRUE)
+plot(frequentist.naive_reg.roc_curve,
+     print.auc=TRUE, col="blue", lwd=3, lty=2,
+     main="ROC Curve of Frequentist naive model")
+```
+
+```{r, echo=FALSE}
+frequentist.better_reg.pred <- predict(frequentist.better_reg, newdata = test_data)
+frequentist.better_reg.roc_curve <- roc(response = test_data$Diagnosis, 
+                                       predictor = frequentist.better_reg.pred, quiet = TRUE)
+plot(frequentist.better_reg.roc_curve,
+     print.auc=TRUE, col="blue", lwd=3, lty=2,
+     main="ROC Curve of Frequentist naive model")
+```
+
+### Model diagnostics
+
+residual vs fitted
+normal Q-Q
+Scale-Location
+
+AIC
+
 ## Bayesian 
+
+waic
+loo
+roc
+
+priot choice?
+  In addition to the problem of collinearity, familiar from linear regression, discrete-data regression can also become unsta- ble from separation, which arises when a linear combination of the predictors is perfectly predictive of the outcome (Bayesian Data Analysis, p. 412)
+  For each coefficient, we assume a Student-t prior distribution with mean 0, degrees-of-freedom parameter ν, and scale s, with ν and s chosen to provide minimal prior information to constrain the coefficients to lie in a reasonable range. We are motivated to consider the t family because flat-tailed distributions allow for robust inference (Bayesian Data Analysis, p. 412)
+  We center our default prior distributions at zero because, in the absence of any problem- specific information, we have no idea if the coefficients β will be positive or negative. We now need to choose default values of the scale s and degrees of freedom ν in the t prior distributions on the coefficients of the rescaled coefficients. (Bayesian Data Analysis, p. 416)
+  If we were to apply the Cauchy prior distribution with center 0 and scale 2.5 to the constant term as well, we would be stating that the success probability is probably between 1% and 99% for units that are average in all the inputs. Depending on the context (for example, epidemiologic modeling of rare conditions), this might not make sense, so as a default we apply a weaker prior distribution—a Cauchy with center 0 and scale 10, which implies that we expect the success probability for an average case to be between 10−9 and 1−10−9. We typically have more information about the intercept than about any particular coefficient and so we can get by with a weaker prior. (Bayesian Data Analysis, p. 416)
+  default Cauchy prior distributions with center 0 and scale 10 (for the constant term) and 2.5 (for the coefficient of dose). (Bayesian Data Analysis, p. 418)
+
+
+These prob- lems, which are sometimes summarized by the label ‘overfitting,’ are of much less concern with reasonable prior distributions, such as those applied in hierarchical linear models, as we shall see in Chapter 15. (Bayesian Data Analysis, p. 367)
+
+why colllinearity is bad in Bayesian
+The near-collinearity of the data means that the posterior variance of the regression coefficients would be high in this hypothetical case. Another problem in addition to increased uncertainty conditional on the regression model is that in practice the inferences would be highly sensitive to the model’s assumption that E(y|x, θ) is linear in x. (Bayesian Data Analysis, p. 366)
+
+## Comparison between models from Frequentist and Bayesian approaches
+
+
+WAIC vs AIC
+
+Confidence vs Credible
 
 ## Appendix
 
 ```{r}
 summary(frequentist.naive_reg)
+```
+
+```{r}
+summary(frequentist.better_reg)
 ```
 
