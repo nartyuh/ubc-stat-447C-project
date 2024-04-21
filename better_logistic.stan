@@ -9,14 +9,12 @@ data {
   vector[N] x10;
   int<lower=0,upper=1> y[N];
   
-  // test data
-  int<lower=0> N_new;
-  vector[N_new] x1_new;
-  vector[N_new] x2_new;
-  vector[N_new] x5_new;
-  vector[N_new] x7_new;
-  vector[N_new] x9_new;
-  vector[N_new] x10_new;
+  real x1_pred;
+  real x2_pred;
+  real x5_pred;
+  real x7_pred;
+  real x9_pred;
+  real x10_pred;
 }
 
 parameters {
@@ -41,10 +39,9 @@ model {
 }
 
 generated quantities {
-  vector[N_new] y_new;
-  for (i in 1:N_new) {
-    y_new[i] = bernoulli_logit_rng(b0 + b1*x1[i] + b2*x2[i] + b5*x5[i] + b7*x7[i] + b9*x9[i] + b10*x10[i]);
-  }
+  real y_pred;
+  y_pred = bernoulli_logit_rng(b0 + b1*x1_pred + b2*x2_pred + b5*x5_pred + b7*x7_pred + b9*x9_pred + b10*x10_pred);
+  
   
   vector[N] log_lik;
   for (i in 1:N) {

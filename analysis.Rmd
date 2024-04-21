@@ -11,14 +11,14 @@ output:
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE, warning = FALSE)
 library(tidyverse)
-# library(LaplacesDemon)
 library(loo)
 library(reshape2)
 library(ggplot2)
 library(pROC)
 library(broom)
 library(regclass)
-require(rstan)
+library(rstan)
+library(bayesplot)
 ```
 
 ## Introduction
@@ -77,94 +77,20 @@ These ten real-valued features are measurements taken and computed for each cell
   \end{tabular}
 \end{center}
 
-We will also divide the dataset into a training dataset of 500 observations and a testing dataset of 69 observations.
+## Base model
+
+### Frequentist
+
+Fitting a base model with every explanatory variables included is a straightforward process with the Frequentist approach.
 
 ```{r}
-train_data <- df[1:500,]
-test_data <- df[501:569,]
+frequentist.base_reg <- 
+  glm(Diagnosis ~ ., data = df, family = binomial(link = "logit"))
 ```
 
-## Frequentist logistic regression
+### Bayesian
 
-### Naive model with every explanatory variables included
-
-```{r}
-frequentist.naive_reg <- 
-  glm(Diagnosis ~ ., data = train_data, family = binomial(link = "logit"))
-```
-
-### Model with the exlcusion of high correlated explanatory variables
-
-```{r, echo=FALSE}
-cor_mat <- round(cor(train_data[, 2:11]), 2)
-melted_cor_mat <- melt(cor_mat)
-ggplot(data = melted_cor_mat, aes(x=Var1, y=Var2, fill=value)) +
-  geom_tile() +
-  geom_text(aes(Var2, Var1, label = value), color = "black", size = 4) +
-  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1)) +
-  xlab("") + ylab("") + ggtitle("Correlation Matrix")
-```
-
-Highly correlated variables:
-
-- `radius` and `perimeter`: 1
-- `radius` and `area`: 0.99
-- `radius` and `concave_points`: 0.82
-- `perimeter` and `area`: 0.99
-- `perimeter` and `concavity`: 0.85
-- `perimeter` and `concave_points`: 0.71
-- `area` and `concave_points`: 0.82
-- `compactness` and `concavity`: 0.89
-- `compactness` and `concave_points`: 0.84
-- `concavity` and `concave_points`: 0.92
-
-The possible loss of precision when including unimportant predictors is usually viewed as a relatively small price to pay for the general validity of predictions and inferences about estimands of interest. (Bayesian Data Analysis, p. 367)
-
-```{r}
-frequentist.better_reg <- 
-  glm(Diagnosis ~ radius1 + texture1 + smoothness1 + concavity1 + symmetry1 + fractal_dimension1, data = train_data, family = binomial(link = "logit"))
-```
-
-
-### Model comparison
-
-AIC
-
-```{r, echo=FALSE}
-frequentist.naive_reg.pred <- predict(frequentist.naive_reg, newdata = test_data)
-frequentist.naive_reg.roc_curve <- roc(response = test_data$Diagnosis, 
-                                       predictor = frequentist.naive_reg.pred, quiet = TRUE)
-plot(frequentist.naive_reg.roc_curve,
-     print.auc=TRUE, col="blue", lwd=3, lty=2,
-     main="ROC Curve of Frequentist naive model")
-```
-
-```{r, echo=FALSE}
-frequentist.better_reg.pred <- predict(frequentist.better_reg, newdata = test_data)
-frequentist.better_reg.roc_curve <- roc(response = test_data$Diagnosis, 
-                                       predictor = frequentist.better_reg.pred, quiet = TRUE)
-plot(frequentist.better_reg.roc_curve,
-     print.auc=TRUE, col="blue", lwd=3, lty=2,
-     main="ROC Curve of Frequentist better model")
-```
-
-### Model diagnostics
-
-Influential
-
-```{r}
-model.data <- augment(frequentist.better_reg) %>% mutate(index = 1:n()) 
-model.data %>% filter(abs(.std.resid) > 3)
-```
-
-Multicollinearity/VIF
-
-```{r}
-VIF(frequentist.better_reg)
-```
-
-
-## Bayesian logistic regression
+In contrast to the simplicity of the Frequentist approach, fitting a Bayesian regression model is a more hands-on process.
 
 Let $\beta_0$ be the intercept parameter and $\beta_1,...\beta_{10}$ be the slope parameters for `radius`, `texture`, `perimeter`, `area`, `smoothness`, `compactness`, `concavity`, `concave_points`, `symmetry`, and `fractal_dimension` correspondingly.
 
@@ -201,13 +127,7 @@ bayesian.df$symmetry1 <- df$symmetry1/sd(df$symmetry1)/2
 
 bayesian.df$fractal_dimension1 <- df$fractal_dimension1 - mean(df$fractal_dimension1)
 bayesian.df$fractal_dimension1 <- df$fractal_dimension1/sd(df$fractal_dimension1)/2
-
-bayesian.train_data <- df[1:500,]
-bayesian.test_data <- df[501:569,]
 ```
-
-
-### Model with priors for every explanatory variables
 
 \begin{align}
   \beta_0 & \sim \text{Cauchy}(0, 10) \\
@@ -216,44 +136,79 @@ bayesian.test_data <- df[501:569,]
 \end{align}
 
 ```{r, echo=FALSE}
+N_obs <- nrow(bayesian.df)
+N_train <- N_obs-1 
 bayesian.base_reg.dat <- list(
-  N = 500,
-  x1 = bayesian.train_data$radius1,
-  x2 = bayesian.train_data$texture1,
-  x3 = bayesian.train_data$perimeter1,
-  x4 = bayesian.train_data$area1,
-  x5 = bayesian.train_data$smoothness1,
-  x6 = bayesian.train_data$compactness1,
-  x7 = bayesian.train_data$concavity1,
-  x8 = bayesian.train_data$concave_points1,
-  x9 = bayesian.train_data$symmetry1,
-  x10 = bayesian.train_data$fractal_dimension1,
-  y = bayesian.train_data$Diagnosis,
-  N_new = 69,
-  x1_new = bayesian.test_data$radius1,
-  x2_new = bayesian.test_data$texture1,
-  x3_new = bayesian.test_data$perimeter1,
-  x4_new = bayesian.test_data$area1,
-  x5_new = bayesian.test_data$smoothness1,
-  x6_new = bayesian.test_data$compactness1,
-  x7_new = bayesian.test_data$concavity1,
-  x8_new = bayesian.test_data$concave_points1,
-  x9_new = bayesian.test_data$symmetry1,
-  x10_new = bayesian.test_data$fractal_dimension1
+  N = N_train,
+  x1 = bayesian.df$radius1[-N_obs],
+  x2 = bayesian.df$texture1[-N_obs],
+  x3 = bayesian.df$perimeter1[-N_obs],
+  x4 = bayesian.df$area1[-N_obs],
+  x5 = bayesian.df$smoothness1[-N_obs],
+  x6 = bayesian.df$compactness1[-N_obs],
+  x7 = bayesian.df$concavity1[-N_obs],
+  x8 = bayesian.df$concave_points1[-N_obs],
+  x9 = bayesian.df$symmetry1[-N_obs],
+  x10 = bayesian.df$fractal_dimension1[-N_obs],
+  y = bayesian.df$Diagnosis[-N_obs],
+  
+  x1_pred = bayesian.df$radius1[N_obs],
+  x2_pred = bayesian.df$texture1[N_obs],
+  x3_pred = bayesian.df$perimeter1[N_obs],
+  x4_pred = bayesian.df$area1[N_obs],
+  x5_pred = bayesian.df$smoothness1[N_obs],
+  x6_pred = bayesian.df$compactness1[N_obs],
+  x7_pred = bayesian.df$concavity1[N_obs],
+  x8_pred = bayesian.df$concave_points1[N_obs],
+  x9_pred = bayesian.df$symmetry1[N_obs],
+  x10_pred = bayesian.df$fractal_dimension1[N_obs]
 )
 ```
 
-
-```{r, message=FALSE}
-bayesian.base_reg <- stan(
-  seed = 123,
-  file = "base_logistic.stan",
+```{r, results='hide'}
+bayesian.base_model <- stan_model("base_logistic.stan")
+bayesian.base_reg <- sampling(
+  bayesian.base_model,
   data = bayesian.base_reg.dat,
-  iter = 1000
+  seed = 123, iter = 1000
 )
 ```
 
-### Model with exclusion of highly correlated explanatory variables
+## Model with the exclusion of high correlated explanatory variables
+
+```{r, echo=FALSE}
+cor_mat <- round(cor(df[, 2:11]), 2)
+melted_cor_mat <- melt(cor_mat)
+ggplot(data = melted_cor_mat, aes(x=Var1, y=Var2, fill=value)) +
+  geom_tile() +
+  geom_text(aes(Var2, Var1, label = value), color = "black", size = 4) +
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1)) +
+  xlab("") + ylab("") + ggtitle("Correlation Matrix")
+```
+
+Highly correlated variables:
+
+- `radius` and `perimeter`: 1
+- `radius` and `area`: 0.99
+- `radius` and `concave_points`: 0.82
+- `perimeter` and `area`: 0.99
+- `perimeter` and `concavity`: 0.85
+- `perimeter` and `concave_points`: 0.71
+- `area` and `concave_points`: 0.82
+- `compactness` and `concavity`: 0.89
+- `compactness` and `concave_points`: 0.84
+- `concavity` and `concave_points`: 0.92
+
+The possible loss of precision when including unimportant predictors is usually viewed as a relatively small price to pay for the general validity of predictions and inferences about estimands of interest. (Bayesian Data Analysis, p. 367)
+
+### Frequentist
+
+```{r}
+frequentist.better_reg <- 
+  glm(Diagnosis ~ radius1 + texture1 + smoothness1 + concavity1 + symmetry1 + fractal_dimension1, data = df, family = binomial(link = "logit"))
+```
+
+### Bayesian
 
 why colllinearity is bad in Bayesian
 The near-collinearity of the data means that the posterior variance of the regression coefficients would be high in this hypothetical case. Another problem in addition to increased uncertainty conditional on the regression model is that in practice the inferences would be highly sensitive to the model’s assumption that $E(y|x, \theta)$ is linear in x. (Bayesian Data Analysis, p. 366)
@@ -270,35 +225,53 @@ The near-collinearity of the data means that the posterior variance of the regre
 \end{align}
 
 ```{r, echo=FALSE}
+N_obs <- nrow(bayesian.df)
+N_train <- N_obs-1 
 bayesian.better_reg.dat <- list(
-  N = 500,
-  x1 = bayesian.train_data$radius1,
-  x2 = bayesian.train_data$texture1,
-  x5 = bayesian.train_data$smoothness1,
-  x7 = bayesian.train_data$concavity1,
-  x9 = bayesian.train_data$symmetry1,
-  x10 = bayesian.train_data$fractal_dimension1,
-  y = bayesian.train_data$Diagnosis,
-  N_new = 69,
-  x1_new = bayesian.test_data$radius1,
-  x2_new = bayesian.test_data$texture1,
-  x5_new = bayesian.test_data$smoothness1,
-  x7_new = bayesian.test_data$concavity1,
-  x9_new = bayesian.test_data$symmetry1,
-  x10_new = bayesian.test_data$fractal_dimension1
+  N = N_train,
+  x1 = bayesian.df$radius1[-N_obs],
+  x2 = bayesian.df$texture1[-N_obs],
+  x5 = bayesian.df$smoothness1[-N_obs],
+  x7 = bayesian.df$concavity1[-N_obs],
+  x9 = bayesian.df$symmetry1[-N_obs],
+  x10 = bayesian.df$fractal_dimension1[-N_obs],
+  y = bayesian.df$Diagnosis[-N_obs],
+  
+  x1_pred = bayesian.df$radius1[N_obs],
+  x2_pred = bayesian.df$texture1[N_obs],
+  x5_pred = bayesian.df$smoothness1[N_obs],
+  x7_pred = bayesian.df$concavity1[N_obs],
+  x9_pred = bayesian.df$symmetry1[N_obs],
+  x10_pred = bayesian.df$fractal_dimension1[N_obs]
 )
 ```
 
-```{r, message=FALSE}
-bayesian.better_reg <- stan(
-  seed = 123,
-  file = "better_logistic.stan",
+```{r, results='hide'}
+bayesian.better_model <- stan_model("better_logistic.stan")
+bayesian.better_reg <- sampling(
+  bayesian.better_model,
   data = bayesian.better_reg.dat,
-  iter = 1000
+  seed = 123, iter = 1000
 )
 ```
 
-### Model comparison
+## Model comparison
+
+### Frequentist
+
+```{r}
+AIC(frequentist.base_reg)
+```
+
+```{r}
+AIC(frequentist.better_reg)
+```
+
+### Bayesian
+
+#### WAIC
+
+\
 
 ```{r}
 waic(extract_log_lik(bayesian.base_reg))$waic
@@ -308,6 +281,10 @@ waic(extract_log_lik(bayesian.base_reg))$waic
 waic(extract_log_lik(bayesian.better_reg))$waic
 ```
 
+#### LOOIC
+
+\
+
 ```{r}
 loo(extract_log_lik(bayesian.base_reg))$looic
 ```
@@ -316,17 +293,73 @@ loo(extract_log_lik(bayesian.base_reg))$looic
 loo(extract_log_lik(bayesian.better_reg))$looic
 ```
 
-## Comparison between models from Frequentist and Bayesian approaches
+## Model diagnostics
 
-Confidence vs Credible
+### Frequentist
+
+Lineairty assumption
+
+Influential outliers
+
+```{r}
+model.data <- augment(frequentist.better_reg) %>% mutate(index = 1:n()) 
+model.data %>% filter(abs(.std.resid) > 3)
+```
+
+Multicollinearity/VIF
+
+```{r}
+VIF(frequentist.better_reg)
+```
+
+### Bayesian
+
+#### Prior predictive checks
+
+\
+
+```{r, include=FALSE}
+suppressPackageStartupMessages(library(extraDistr))
+```
+
+
+```{r}
+logistic_regression <- function(X) {
+  b <- append(rcauchy(1, 0, 10), rcauchy(ncol(X) - 1, 0, 2.5))
+  p <- plogis(as.vector(X %*% b))
+  y <- rbern(nrow(X), p)
+  mean(y)
+}
+```
+
+```{r}
+pred_prob = 0.9
+n_obs = 100
+n_sim = 100000
+opar = par(mfrow=c(1,3))
+for(n_pred in c(2,4,15)) {
+    X = matrix(rbern(n_obs*n_pred, pred_prob), nrow=n_obs)
+    simulated_ybars = replicate(n_sim, logistic_regression(X))
+    hist(simulated_ybars, breaks=20, ylim=c(0,17000),
+         main=paste(n_pred, "predictors"), xlab = "Average outcome")
+}
+```
+
+
+
+#### MCMC diagnostics
+
+\
+
+```{r}
+mcmc_trace(bayesian.better_reg, pars = c("b0")) + theme_minimal()
+```
+
+```{r}
+mcmc_rank_hist(bayesian.better_reg, pars = c("b0")) + theme_minimal()
+```
+
+## Direct comparison between Frequentist and Bayesian
 
 ## Appendix
-
-```{r}
-summary(frequentist.naive_reg)
-```
-
-```{r}
-summary(frequentist.better_reg)
-```
 
