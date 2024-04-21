@@ -1,0 +1,113 @@
+---
+title: 'STAT 447C: Final Project'
+author: "Andrew Tran"
+date: "`r Sys.Date()`"
+output:
+  pdf_document: default
+  html_document:
+    df_print: paged
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE)
+library(tidyverse)
+library(LaplacesDemon)
+library(reshape2)
+library(ggplot2)
+```
+
+## Introduction
+
+## Goals of the project
+
+## Data description
+
+```{r, echo=FALSE}
+df <- read.csv("data/breast_cancer_wisconsin.csv")
+df <- as_tibble(df)
+```
+
+Our response variable is `Diagnosis`, which is categorical. Currently, it's being labelled as **M** (malignant) or **B** (benign). We want to transform it into binary values so that **1** and **0** are equivalent to **M** and **B** respectively.
+
+```{r, echo=FALSE}
+df$Diagnosis <- factor(df$Diagnosis)
+df$Diagnosis <- as.numeric(df$Diagnosis) - 1
+```
+
+The Breast Cancer Wisconsin (Diagnostic) data set has 30 explanatory variables. However, in fact, they have 10 main features. For each feature, the mean, standard error, and worst/largest  values are recorded. For example, for a single observation in the data, `radius1` is the mean of distances from center to points on the perimeter, `radius2` is the standard error those distances, and `radius3` is largest distance measured. For the sake of length, we are only interested the means.
+
+```{r, echo=FALSE}
+df <- df[, 1:11]
+```
+
+These ten real-valued features are measurements taken and computed for each cell nucleus:
+
+\begin{center}
+  \begin{tabular}{|c c c|} 
+    \hline
+    Variable & Type & Description \\
+    \hline\hline
+    Radius & Quantitative & Distance from center to points on the perimeter of the tumor \\ 
+    \hline
+    Texture & Quantitative & Gray-scale value \\
+    \hline
+    Perimeter & Quantitative & Size of the tumor\\
+    \hline
+    Area & Quantitative & Area of the tumor \\
+    \hline
+    Smoothness & Quantitative & Local variation in radius length \\
+    \hline
+    Compactness & Quantitative & $\frac{\text{perimeter}^2}{\text{area}} - 1$ \\
+    \hline
+    Concavity & Quantitative & Severity of concave portions of the contour\\
+    \hline
+    Concave points & Quantitative & Number of concave portions of the contour\\
+    \hline
+    Symmetry & Quantitative & Symmetrical measurement of the tumor\\
+    \hline
+    Fractal dimension & Quantitative & $\text{coastline approximation} - 1$\\
+    \hline
+  \end{tabular}
+\end{center}
+
+## Exploratory Data Analysis
+
+```{r, echo=FALSE}
+par(mar = c(4, 3.8, 1, 1))
+par(mfrow = c(2,2))
+hist(df$radius1, xlab = "radius", main = "")
+hist(df$texture1, xlab = "texture", main = "")
+hist(df$perimeter1, xlab = "perimeter", main = "")
+hist(df$area1, xlab = "area", main = "")
+hist(df$smoothness1, xlab = "smoothness", main = "")
+hist(df$compactness1, xlab = "compactness", main = "")
+hist(df$concavity1, xlab = "concavity", main = "")
+hist(df$concave_points1, xlab = "concave points", main = "")
+hist(df$symmetry1, xlab = "symmetry", main = "")
+hist(df$fractal_dimension1, xlab = "fractal dimension", main = "")
+```
+
+```{r, echo=FALSE}
+cor_mat <- round(cor(df[, 2:11]), 2)
+melted_cor_mat <- melt(cor_mat)
+ggplot(data = melted_cor_mat, aes(x=Var1, y=Var2, fill=value)) + 
+  geom_tile() +
+  geom_text(aes(Var2, Var1, label = value), color = "black", size = 4) +
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1)) +
+  xlab("") + ylab("") + ggtitle("Correlation Matrix")
+```
+
+## Frequentist logistic regression
+
+```{r}
+frequentist.naive_reg <- glm(Diagnosis ~ ., data = df, family = binomial(link = "logit"))
+```
+
+## Bayesian 
+
+## Appendix
+
+```{r}
+summary(frequentist.naive_reg)
+```
+
