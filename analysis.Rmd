@@ -11,12 +11,14 @@ output:
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE, warning = FALSE)
 library(tidyverse)
-library(LaplacesDemon)
+# library(LaplacesDemon)
+library(loo)
 library(reshape2)
 library(ggplot2)
 library(pROC)
 library(broom)
 library(regclass)
+require(rstan)
 ```
 
 ## Introduction
@@ -213,6 +215,9 @@ df$symmetry1 <- df$symmetry1/sd(df$symmetry1)/2
 
 df$fractal_dimension1 <- df$fractal_dimension1 - mean(df$fractal_dimension1)
 df$fractal_dimension1 <- df$fractal_dimension1/sd(df$fractal_dimension1)/2
+
+train_data <- df[1:500,]
+test_data <- df[501:569,]
 ```
 
 
@@ -223,6 +228,91 @@ df$fractal_dimension1 <- df$fractal_dimension1/sd(df$fractal_dimension1)/2
   \beta_i & \overset{\text{iid}}{\sim} \text{Cauchy}(0, 2.5) & \text{ for } i \in \{1,...,10\} \\
   y_n|\beta & \sim \text{Bern}(\text{logistic}(\beta_0 + \beta_1x_{n,1} + ... + \beta_{10}x_{n,10})) & n \in \{1,...,n_\text{obs}\}
 \end{align}
+
+```{r, echo=FALSE}
+bayesian.base_reg.dat <- list(
+  N = 500,
+  x1 = train_data$radius1,
+  x2 = train_data$texture1,
+  x3 = train_data$perimeter1,
+  x4 = train_data$area1,
+  x5 = train_data$smoothness1,
+  x6 = train_data$compactness1,
+  x7 = train_data$concavity1,
+  x8 = train_data$concave_points1,
+  x9 = train_data$symmetry1,
+  x10 = train_data$fractal_dimension1,
+  y = train_data$Diagnosis,
+  N_new = 69,
+  x1_new = test_data$radius1,
+  x2_new = test_data$texture1,
+  x3_new = test_data$perimeter1,
+  x4_new = test_data$area1,
+  x5_new = test_data$smoothness1,
+  x6_new = test_data$compactness1,
+  x7_new = test_data$concavity1,
+  x8_new = test_data$concave_points1,
+  x9_new = test_data$symmetry1,
+  x10_new = test_data$fractal_dimension1
+)
+```
+
+
+```{r, message=FALSE}
+bayesian.base_reg <- stan(
+  seed = 123,
+  file = "base_logistic.stan",
+  data = bayesian.base_reg.dat,
+  iter = 1000
+)
+```
+
+```{r}
+
+```
+
+### Model with exclusion of highly correlated explanatory variables
+
+\begin{align}
+  \beta_0 & \sim \text{Cauchy}(0, 10) \\
+  \beta_1 & \sim \text{Cauchy}(0, 2.5) \\
+  \beta_2 & \sim \text{Cauchy}(0, 2.5) \\
+  \beta_5 & \sim \text{Cauchy}(0, 2.5) \\
+  \beta_7 & \sim \text{Cauchy}(0, 2.5) \\
+  \beta_9 & \sim \text{Cauchy}(0, 2.5) \\
+  \beta_10 & \sim \text{Cauchy}(0, 2.5) \\
+  y_n|\beta & \sim \text{Bern}(\text{logistic}(\beta_0 + \beta_1x_{n,1} + \beta_2x_{n,2} + \beta_5x_{n,5} + \beta_7x_{n,7} + \beta_9x_{n,9} + \beta_{10}x_{n,10})) & n \in \{1,...,n_\text{obs}\}
+\end{align}
+
+```{r, echo=FALSE}
+bayesian.better_reg.dat <- list(
+  N = 500,
+  x1 = train_data$radius1,
+  x2 = train_data$texture1,
+  x5 = train_data$smoothness1,
+  x7 = train_data$concavity1,
+  x9 = train_data$symmetry1,
+  x10 = train_data$fractal_dimension1,
+  y = train_data$Diagnosis,
+  N_new = 69,
+  x1_new = test_data$radius1,
+  x2_new = test_data$texture1,
+  x5_new = test_data$smoothness1,
+  x7_new = test_data$concavity1,
+  x9_new = test_data$symmetry1,
+  x10_new = test_data$fractal_dimension1
+)
+```
+
+
+```{r, message=FALSE}
+bayesian.better_reg <- stan(
+  seed = 123,
+  file = "better_logistic.stan",
+  data = bayesian.better_reg.dat,
+  iter = 1000
+)
+```
 
 waic
 loo
