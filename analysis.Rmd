@@ -84,21 +84,6 @@ train_data <- df[1:500,]
 test_data <- df[501:569,]
 ```
 
-```{r, echo=FALSE}
-# par(mar = c(4, 3.8, 1, 1))
-# par(mfrow = c(2, 5))
-# hist(df$radius1, xlab = "radius", main = "")
-# hist(df$texture1, xlab = "texture", main = "")
-# hist(df$perimeter1, xlab = "perimeter", main = "")
-# hist(df$area1, xlab = "area", main = "")
-# hist(df$smoothness1, xlab = "smoothness", main = "")
-# hist(df$compactness1, xlab = "compactness", main = "")
-# hist(df$concavity1, xlab = "concavity", main = "")
-# hist(df$concave_points1, xlab = "concave points", main = "")
-# hist(df$symmetry1, xlab = "symmetry", main = "")
-# hist(df$fractal_dimension1, xlab = "fractal dimension", main = "")
-```
-
 ## Frequentist logistic regression
 
 ### Naive model with every explanatory variables included
@@ -186,38 +171,39 @@ Let $\beta_0$ be the intercept parameter and $\beta_1,...\beta_{10}$ be the slop
 To fit a Bayesian logistic regression to our data, we need to specify our Bayesian model. One of the important tasks when specifying our model is the selection of prior distributions. We often select generic weakly informative priors like $Normal(0,1)$ to perform regression task in Bayesian approach. This choice could work in our case as we are attempting to fit a logistic regression model. However, logistic regression can also become unstable from separation, a problem when the outcome variable separates a predictor variable perfectly. (Bayesian Data Analysis, p. 412) To avoid this problem, Gelman et al. (2008) suggested the Cauchy distribution with center 0 and scale set to 2.5 for the slopes and 10 for the intercept. We will employ this choice of prior to model Bayesian logistic regression. To proceed with approach, it is required that we center and scale our nonbinary variables to have mean 0 and standard deviation 0.5. (Gelman et al., 2008)
 
 ```{r, echo=FALSE}
-df$radius1 <- df$radius1 - mean(df$radius1)
-df$radius1 <- df$radius1/sd(df$radius1)/2
+bayesian.df <- df
+bayesian.df$radius1 <- df$radius1 - mean(df$radius1)
+bayesian.df$radius1 <- df$radius1/sd(df$radius1)/2
 
-df$texture1 <- df$texture1 - mean(df$texture1)
-df$texture1 <- df$texture1/sd(df$texture1)/2
+bayesian.df$texture1 <- df$texture1 - mean(df$texture1)
+bayesian.df$texture1 <- df$texture1/sd(df$texture1)/2
 
-df$perimeter1 <- df$perimeter1 - mean(df$perimeter1)
-df$perimeter1 <- df$perimeter1/sd(df$perimeter1)/2
+bayesian.df$perimeter1 <- df$perimeter1 - mean(df$perimeter1)
+bayesian.df$perimeter1 <- df$perimeter1/sd(df$perimeter1)/2
 
-df$area1 <- df$area1 - mean(df$area1)
-df$area1 <- df$area1/sd(df$area1)/2
+bayesian.df$area1 <- df$area1 - mean(df$area1)
+bayesian.df$area1 <- df$area1/sd(df$area1)/2
 
-df$smoothness1 <- df$smoothness1 - mean(df$smoothness1)
-df$smoothness1 <- df$smoothness1/sd(df$smoothness1)/2
+bayesian.df$smoothness1 <- df$smoothness1 - mean(df$smoothness1)
+bayesian.df$smoothness1 <- df$smoothness1/sd(df$smoothness1)/2
 
-df$compactness1 <- df$compactness1 - mean(df$compactness1)
-df$compactness1 <- df$compactness1/sd(df$compactness1)/2
+bayesian.df$compactness1 <- df$compactness1 - mean(df$compactness1)
+bayesian.df$compactness1 <- df$compactness1/sd(df$compactness1)/2
 
-df$concavity1 <- df$concave_points1 - mean(df$concavity1)
-df$concavity1 <- df$concavity1/sd(df$concavity1)/2
+bayesian.df$concavity1 <- df$concave_points1 - mean(df$concavity1)
+bayesian.df$concavity1 <- df$concavity1/sd(df$concavity1)/2
 
-df$concave_points1 <- df$concave_points1 - mean(df$concave_points1)
-df$concave_points1 <- df$concave_points1/sd(df$concave_points1)/2
+bayesian.df$concave_points1 <- df$concave_points1 - mean(df$concave_points1)
+bayesian.df$concave_points1 <- df$concave_points1/sd(df$concave_points1)/2
 
-df$symmetry1 <- df$symmetry1 - mean(df$symmetry1)
-df$symmetry1 <- df$symmetry1/sd(df$symmetry1)/2
+bayesian.df$symmetry1 <- df$symmetry1 - mean(df$symmetry1)
+bayesian.df$symmetry1 <- df$symmetry1/sd(df$symmetry1)/2
 
-df$fractal_dimension1 <- df$fractal_dimension1 - mean(df$fractal_dimension1)
-df$fractal_dimension1 <- df$fractal_dimension1/sd(df$fractal_dimension1)/2
+bayesian.df$fractal_dimension1 <- df$fractal_dimension1 - mean(df$fractal_dimension1)
+bayesian.df$fractal_dimension1 <- df$fractal_dimension1/sd(df$fractal_dimension1)/2
 
-train_data <- df[1:500,]
-test_data <- df[501:569,]
+bayesian.train_data <- df[1:500,]
+bayesian.test_data <- df[501:569,]
 ```
 
 
@@ -232,28 +218,28 @@ test_data <- df[501:569,]
 ```{r, echo=FALSE}
 bayesian.base_reg.dat <- list(
   N = 500,
-  x1 = train_data$radius1,
-  x2 = train_data$texture1,
-  x3 = train_data$perimeter1,
-  x4 = train_data$area1,
-  x5 = train_data$smoothness1,
-  x6 = train_data$compactness1,
-  x7 = train_data$concavity1,
-  x8 = train_data$concave_points1,
-  x9 = train_data$symmetry1,
-  x10 = train_data$fractal_dimension1,
-  y = train_data$Diagnosis,
+  x1 = bayesian.train_data$radius1,
+  x2 = bayesian.train_data$texture1,
+  x3 = bayesian.train_data$perimeter1,
+  x4 = bayesian.train_data$area1,
+  x5 = bayesian.train_data$smoothness1,
+  x6 = bayesian.train_data$compactness1,
+  x7 = bayesian.train_data$concavity1,
+  x8 = bayesian.train_data$concave_points1,
+  x9 = bayesian.train_data$symmetry1,
+  x10 = bayesian.train_data$fractal_dimension1,
+  y = bayesian.train_data$Diagnosis,
   N_new = 69,
-  x1_new = test_data$radius1,
-  x2_new = test_data$texture1,
-  x3_new = test_data$perimeter1,
-  x4_new = test_data$area1,
-  x5_new = test_data$smoothness1,
-  x6_new = test_data$compactness1,
-  x7_new = test_data$concavity1,
-  x8_new = test_data$concave_points1,
-  x9_new = test_data$symmetry1,
-  x10_new = test_data$fractal_dimension1
+  x1_new = bayesian.test_data$radius1,
+  x2_new = bayesian.test_data$texture1,
+  x3_new = bayesian.test_data$perimeter1,
+  x4_new = bayesian.test_data$area1,
+  x5_new = bayesian.test_data$smoothness1,
+  x6_new = bayesian.test_data$compactness1,
+  x7_new = bayesian.test_data$concavity1,
+  x8_new = bayesian.test_data$concave_points1,
+  x9_new = bayesian.test_data$symmetry1,
+  x10_new = bayesian.test_data$fractal_dimension1
 )
 ```
 
@@ -267,11 +253,10 @@ bayesian.base_reg <- stan(
 )
 ```
 
-```{r}
-
-```
-
 ### Model with exclusion of highly correlated explanatory variables
+
+why colllinearity is bad in Bayesian
+The near-collinearity of the data means that the posterior variance of the regression coefficients would be high in this hypothetical case. Another problem in addition to increased uncertainty conditional on the regression model is that in practice the inferences would be highly sensitive to the model’s assumption that $E(y|x, \theta)$ is linear in x. (Bayesian Data Analysis, p. 366)
 
 \begin{align}
   \beta_0 & \sim \text{Cauchy}(0, 10) \\
@@ -287,23 +272,22 @@ bayesian.base_reg <- stan(
 ```{r, echo=FALSE}
 bayesian.better_reg.dat <- list(
   N = 500,
-  x1 = train_data$radius1,
-  x2 = train_data$texture1,
-  x5 = train_data$smoothness1,
-  x7 = train_data$concavity1,
-  x9 = train_data$symmetry1,
-  x10 = train_data$fractal_dimension1,
-  y = train_data$Diagnosis,
+  x1 = bayesian.train_data$radius1,
+  x2 = bayesian.train_data$texture1,
+  x5 = bayesian.train_data$smoothness1,
+  x7 = bayesian.train_data$concavity1,
+  x9 = bayesian.train_data$symmetry1,
+  x10 = bayesian.train_data$fractal_dimension1,
+  y = bayesian.train_data$Diagnosis,
   N_new = 69,
-  x1_new = test_data$radius1,
-  x2_new = test_data$texture1,
-  x5_new = test_data$smoothness1,
-  x7_new = test_data$concavity1,
-  x9_new = test_data$symmetry1,
-  x10_new = test_data$fractal_dimension1
+  x1_new = bayesian.test_data$radius1,
+  x2_new = bayesian.test_data$texture1,
+  x5_new = bayesian.test_data$smoothness1,
+  x7_new = bayesian.test_data$concavity1,
+  x9_new = bayesian.test_data$symmetry1,
+  x10_new = bayesian.test_data$fractal_dimension1
 )
 ```
-
 
 ```{r, message=FALSE}
 bayesian.better_reg <- stan(
@@ -314,27 +298,25 @@ bayesian.better_reg <- stan(
 )
 ```
 
-waic
-loo
-roc
+### Model comparison
 
-prior choice?
-  In addition to the problem of collinearity, familiar from linear regression, discrete-data regression can also become unsta- ble from separation, which arises when a linear combination of the predictors is perfectly predictive of the outcome (Bayesian Data Analysis, p. 412)
-  For each coefficient, we assume a Student-t prior distribution with mean 0, degrees-of-freedom parameter v, and scale s, with v and s chosen to provide minimal prior information to constrain the coefficients to lie in a reasonable range. We are motivated to consider the t family because flat-tailed distributions allow for robust inference (Bayesian Data Analysis, p. 412)
-  We center our default prior distributions at zero because, in the absence of any problem- specific information, we have no idea if the coefficients $\beta$ will be positive or negative. We now need to choose default values of the scale s and degrees of freedom v in the t prior distributions on the coefficients of the rescaled coefficients. (Bayesian Data Analysis, p. 416)
-  If we were to apply the Cauchy prior distribution with center 0 and scale 2.5 to the constant term as well, we would be stating that the success probability is probably between 1% and 99% for units that are average in all the inputs. Depending on the context (for example, epidemiologic modeling of rare conditions), this might not make sense, so as a default we apply a weaker prior distribution - a Cauchy with center 0 and scale 10, which implies that we expect the success probability for an average case to be between 10-9 and 1-10-9. We typically have more information about the intercept than about any particular coefficient and so we can get by with a weaker prior. (Bayesian Data Analysis, p. 416)
-  default Cauchy prior distributions with center 0 and scale 10 (for the constant term) and 2.5 (for the coefficient of dose). (Bayesian Data Analysis, p. 418)
+```{r}
+waic(extract_log_lik(bayesian.base_reg))$waic
+```
 
+```{r}
+waic(extract_log_lik(bayesian.better_reg))$waic
+```
 
-These prob- lems, which are sometimes summarized by the label ‘overfitting,’ are of much less concern with reasonable prior distributions, such as those applied in hierarchical linear models, as we shall see in Chapter 15. (Bayesian Data Analysis, p. 367)
+```{r}
+loo(extract_log_lik(bayesian.base_reg))$looic
+```
 
-why colllinearity is bad in Bayesian
-The near-collinearity of the data means that the posterior variance of the regression coefficients would be high in this hypothetical case. Another problem in addition to increased uncertainty conditional on the regression model is that in practice the inferences would be highly sensitive to the model’s assumption that $E(y|x, \theta)$ is linear in x. (Bayesian Data Analysis, p. 366)
+```{r}
+loo(extract_log_lik(bayesian.better_reg))$looic
+```
 
 ## Comparison between models from Frequentist and Bayesian approaches
-
-
-WAIC vs AIC
 
 Confidence vs Credible
 
