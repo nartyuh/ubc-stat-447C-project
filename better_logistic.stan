@@ -8,13 +8,6 @@ data {
   vector[N] x9;
   vector[N] x10;
   int<lower=0,upper=1> y[N];
-  
-  real x1_pred;
-  real x2_pred;
-  real x5_pred;
-  real x7_pred;
-  real x9_pred;
-  real x10_pred;
 }
 
 parameters {
@@ -39,10 +32,6 @@ model {
 }
 
 generated quantities {
-  real y_pred;
-  y_pred = bernoulli_logit_rng(b0 + b1*x1_pred + b2*x2_pred + b5*x5_pred + b7*x7_pred + b9*x9_pred + b10*x10_pred);
-  
-  
   vector[N] log_lik;
   for (i in 1:N) {
     log_lik[i] = bernoulli_logit_lpmf(y[i] | b0 + b1*x1[i] + b2*x2[i] + b5*x5[i] + b7*x7[i] + b9*x9[i] + b10*x10[i]);

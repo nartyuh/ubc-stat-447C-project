@@ -4,8 +4,6 @@ author: "Andrew Tran"
 date: "`r Sys.Date()`"
 output:
   pdf_document: default
-  html_document:
-    df_print: paged
 ---
 
 ```{r setup, include=FALSE}
@@ -27,35 +25,35 @@ https://github.com/nartyuh/ubc-stat-447C-project
 
 ## Introduction
 
-Breast cancer is one the most common and malignant types of cancers. It is life-threatenting to many people around the world, especially women. There are many endeavours that motivate the research to find solutions for breast cancer treatment through the use of computational methods. The Breast Cancer Wisconsin is one of them. The challenge of this dataset is to develop inference and predictive analyses on 569 images of tumor cell nucleus obtained by Fine-Needle Aspiration. This can help with imaging analysis of cancerous cells and provide a tool for early detection.
+Breast cancer is one the most common and malignant types of cancers. It is life-threatenting to many people around the world, especially women. There are many endeavours that motivate the research to find solutions for breast cancer treatment through the use of computational methods. The Breast Cancer Wisconsin is one of them. The challenge of this dataset is to develop inferential and predictive analyses on 569 images of tumor cell nucleus obtained by Fine-Needle Aspiration. This can help with imaging analysis of cancerous cells and provide a tool for early detection of cancer risk.
 
 ## Purpose of the project
 
-The project conducts a comparison between the Frequentist and Bayesian approaches to logistic regression on the Breast Cancer Wisconsin dataset. We will first look at the perspectives of both approaches in terms of variable selection when there is multicollinearity among the explanatory variables. Then we examine how the Frequentist and the Bayesian approach model comparison. Finally, we will perform model diagnostics using each approach's respective methodologies.
+The project conducts a comparison between the Frequentist and Bayesian approaches to logistic regression on the Breast Cancer Wisconsin dataset. We first look at the perspectives of both approaches in terms of variable selection when there is multicollinearity among the explanatory variables. Then we examine how the Frequentists and the Bayesians approach model comparison. Finally, we will perform model diagnostics using each approach's respective methodologies.
 
 By making the comparison between Frequentist and Bayesian approaches, this project hopes to create a discourse around utilizing Bayesian approach for Breast Cancer Wisconsin.
 
 ## Data description
 
-```{r}
+```{r, echo=FALSE}
 df <- read.csv("data/breast_cancer_wisconsin.csv")
 df <- as_tibble(df)
 ```
 
-Our response variable is `Diagnosis`, which is categorical. Currently, it's being labelled as **M** (malignant) or **B** (benign). We want to transform it into binary values so that **1** and **0** are equivalent to **M** and **B** respectively.
+Our response variable is `Diagnosis`, which is categorical. The original dataset labels it as **M** (malignant) or **B** (benign). We want to transform it into binary values so that **1** and **0** are equivalent to **M** and **B** respectively.
 
-```{r}
+```{r, echo=FALSE}
 df$Diagnosis <- factor(df$Diagnosis)
 df$Diagnosis <- as.numeric(df$Diagnosis) - 1
 ```
 
-The Breast Cancer Wisconsin (Diagnostic) data set has 30 explanatory variables. However, in fact, they have 10 main features. For each feature, the mean, standard error, and worst/largest  values are recorded. For example, for a single observation in the data, `radius1` is the mean of distances from center to points on the perimeter, `radius2` is the standard error those distances, and `radius3` is largest distance measured. For the sake of length, we are only interested the means.
+The Breast Cancer Wisconsin (Diagnostic) data set has 30 explanatory variables. However, in fact, they have 10 main features. For each feature, the mean, standard error, and worst/largest values are recorded. For example, for a single observation in the data, `radius1` is the mean of distances from center to points on the perimeter, `radius2` is the standard error those distances, and `radius3` is largest distance measured. For the sake of length, we are only interested in the means.
 
-```{r}
+```{r, echo=FALSE}
 df <- df[, 1:11]
 ```
 
-These ten real-valued features are measurements taken and computed for each cell nucleus:
+These ten real-valued features are measurements taken and computed for each tumor cell nucleus:
 
 \begin{center}
   \begin{tabular}{|c c c|} 
@@ -102,7 +100,7 @@ In contrast to the simplicity of the Frequentist approach, fitting a Bayesian re
 
 Let $\beta_0$ be the intercept parameter and $\beta_1,...\beta_{10}$ be the slope parameters for `radius`, `texture`, `perimeter`, `area`, `smoothness`, `compactness`, `concavity`, `concave_points`, `symmetry`, and `fractal_dimension` correspondingly.
 
-To fit a Bayesian logistic regression to our data, we need to specify our Bayesian model. One of the important tasks when specifying our model is the selection of prior distributions. We often select generic weakly informative priors like $Normal(0,1)$ to perform regression task in Bayesian approach. This choice could work in our case as we are attempting to fit a logistic regression model. However, logistic regression can also become unstable from separation, a problem when the outcome variable separates a predictor variable perfectly. (Bayesian Data Analysis, p. 412) To avoid this problem, Gelman et al. (2008) suggested the Cauchy distribution with center 0 and scale set to 2.5 for the slopes and 10 for the intercept. We will employ this choice of prior to model Bayesian logistic regression. To proceed with approach, it is required that we center and scale our nonbinary variables to have mean 0 and standard deviation 0.5. (Gelman et al., 2008)
+To fit a Bayesian logistic regression to our data, we need to specify our Bayesian model. One of the important tasks when specifying our model is the selection of prior distributions. We often select generic weakly informative priors like $Normal(0,1)$ to perform regression task in Bayesian approach. This choice could work in our case as we are attempting to fit a logistic regression model. However, logistic regression can also become unstable from separation, a problem when the outcome variable separates a predictor variable perfectly. (Bayesian Data Analysis, p. 412) To avoid this problem, Gelman et al. (2008) suggested the Cauchy distribution with center 0 and scale set to 2.5 for the slopes and 10 for the intercept. We will employ this choice of prior to model Bayesian logistic regression. To proceed with this approach, it is required that we center and scale our non-binary variables to have mean 0 and standard deviation 0.5. (Gelman et al., 2008)
 
 ```{r, echo=FALSE}
 bayesian.df <- df
@@ -144,32 +142,19 @@ bayesian.df$fractal_dimension1 <- df$fractal_dimension1/sd(df$fractal_dimension1
 \end{align}
 
 ```{r, echo=FALSE}
-N_obs <- nrow(bayesian.df)
-N_train <- N_obs-1 
 bayesian.base_reg.dat <- list(
-  N = N_train,
-  x1 = bayesian.df$radius1[-N_obs],
-  x2 = bayesian.df$texture1[-N_obs],
-  x3 = bayesian.df$perimeter1[-N_obs],
-  x4 = bayesian.df$area1[-N_obs],
-  x5 = bayesian.df$smoothness1[-N_obs],
-  x6 = bayesian.df$compactness1[-N_obs],
-  x7 = bayesian.df$concavity1[-N_obs],
-  x8 = bayesian.df$concave_points1[-N_obs],
-  x9 = bayesian.df$symmetry1[-N_obs],
-  x10 = bayesian.df$fractal_dimension1[-N_obs],
-  y = bayesian.df$Diagnosis[-N_obs],
-  
-  x1_pred = bayesian.df$radius1[N_obs],
-  x2_pred = bayesian.df$texture1[N_obs],
-  x3_pred = bayesian.df$perimeter1[N_obs],
-  x4_pred = bayesian.df$area1[N_obs],
-  x5_pred = bayesian.df$smoothness1[N_obs],
-  x6_pred = bayesian.df$compactness1[N_obs],
-  x7_pred = bayesian.df$concavity1[N_obs],
-  x8_pred = bayesian.df$concave_points1[N_obs],
-  x9_pred = bayesian.df$symmetry1[N_obs],
-  x10_pred = bayesian.df$fractal_dimension1[N_obs]
+  N = nrow(bayesian.df),
+  x1 = bayesian.df$radius1,
+  x2 = bayesian.df$texture1,
+  x3 = bayesian.df$perimeter1,
+  x4 = bayesian.df$area1,
+  x5 = bayesian.df$smoothness1,
+  x6 = bayesian.df$compactness1,
+  x7 = bayesian.df$concavity1,
+  x8 = bayesian.df$concave_points1,
+  x9 = bayesian.df$symmetry1,
+  x10 = bayesian.df$fractal_dimension1,
+  y = bayesian.df$Diagnosis
 )
 ```
 
@@ -182,35 +167,35 @@ bayesian.base_reg <- sampling(
 )
 ```
 
-## Model with the exclusion of high correlated explanatory variables
+## Model with the exclusion of highly correlated explanatory variables
 
-By looking at the correlation matrix of explanatory variables (Appendix A.1), we identify the following highly correlated features:
+By looking at the correlation matrix of explanatory variables (Appendix A.1), we identify the following highly correlated features: `radius`, `perimeter`, `area`, `compactness`, `concavity`, and `concave_points`.
 
-\begin{center}
-  \begin{tabular}{|c c|} 
-    \hline
-    Pair & Correlation \\
-    \hline\hline
-    radius and perimeter & 1 \\ 
-    \hline
-    radius and area & 0.99 \\
-    \hline
-    radius` and concave\_points & 0.82 \\
-    \hline
-    perimeter and area & 0.99 \\
-    \hline
-    perimeter and concave\_points & 0.85 \\
-    \hline
-    area and concave\_points & 0.82 \\
-    \hline
-    compactness and concavity & 0.88 \\
-    \hline
-    compactness and concave\_points & 0.83 \\
-    \hline
-    concavity and =concave\_points & 0.92 \\
-    \hline
-  \end{tabular}
-\end{center}
+<!-- \begin{center} -->
+<!--   \begin{tabular}{|c c|}  -->
+<!--     \hline -->
+<!--     Pair & Correlation \\ -->
+<!--     \hline\hline -->
+<!--     radius and perimeter & 1 \\  -->
+<!--     \hline -->
+<!--     radius and area & 0.99 \\ -->
+<!--     \hline -->
+<!--     radius` and concave\_points & 0.82 \\ -->
+<!--     \hline -->
+<!--     perimeter and area & 0.99 \\ -->
+<!--     \hline -->
+<!--     perimeter and concave\_points & 0.85 \\ -->
+<!--     \hline -->
+<!--     area and concave\_points & 0.82 \\ -->
+<!--     \hline -->
+<!--     compactness and concavity & 0.88 \\ -->
+<!--     \hline -->
+<!--     compactness and concave\_points & 0.83 \\ -->
+<!--     \hline -->
+<!--     concavity and =concave\_points & 0.92 \\ -->
+<!--     \hline -->
+<!--   \end{tabular} -->
+<!-- \end{center} -->
 
 The above explanatory variables exhibit multicollinearity. In regression analysis, this is undesirable because it undermines the statistical significance of an independent variable, thus leading to skewed or misleading results that can negatively impact a statistical inference task. (Understanding Regression Analysis, p. 176) To resolve this problem, we need to investigate into the source of the high correlation values and remove the collinear variables when it is reasonable to do so.
 
@@ -234,29 +219,20 @@ It is well-known that multicollinearity is undesirable in Frequentist approach t
 
 \begin{align}
   \beta_0 & \sim \text{Cauchy}(0, 10) \\
-  \beta_i & \overset{\text{iid}}{\sim} \text{Cauchy}(0, 2.5) & i \in {1,2,5,7,9,10} \\
+  \beta_i & \overset{\text{iid}}{\sim} \text{Cauchy}(0, 2.5) & i \in \{1,2,5,7,9,10\} \\
   y_n|\beta & \sim \text{Bern}(\text{logistic}(\beta_0 + \beta_1x_{n,1} + \beta_2x_{n,2} + \beta_5x_{n,5} + \beta_7x_{n,7} + \beta_9x_{n,9} + \beta_{10}x_{n,10})) & n \in \{1,...,n_\text{obs}\}
 \end{align}
 
 ```{r, echo=FALSE}
-N_obs <- nrow(bayesian.df)
-N_train <- N_obs-1 
 bayesian.better_reg.dat <- list(
-  N = N_train,
-  x1 = bayesian.df$radius1[-N_obs],
-  x2 = bayesian.df$texture1[-N_obs],
-  x5 = bayesian.df$smoothness1[-N_obs],
-  x7 = bayesian.df$concavity1[-N_obs],
-  x9 = bayesian.df$symmetry1[-N_obs],
-  x10 = bayesian.df$fractal_dimension1[-N_obs],
-  y = bayesian.df$Diagnosis[-N_obs],
-  
-  x1_pred = bayesian.df$radius1[N_obs],
-  x2_pred = bayesian.df$texture1[N_obs],
-  x5_pred = bayesian.df$smoothness1[N_obs],
-  x7_pred = bayesian.df$concavity1[N_obs],
-  x9_pred = bayesian.df$symmetry1[N_obs],
-  x10_pred = bayesian.df$fractal_dimension1[N_obs]
+  N = nrow(bayesian.df),
+  x1 = bayesian.df$radius1,
+  x2 = bayesian.df$texture1,
+  x5 = bayesian.df$smoothness1,
+  x7 = bayesian.df$concavity1,
+  x9 = bayesian.df$symmetry1,
+  x10 = bayesian.df$fractal_dimension1,
+  y = bayesian.df$Diagnosis
 )
 ```
 
@@ -294,6 +270,7 @@ AIC works really well in the Frequentist approach. However, it is not a preferab
 - WAIC can utilize the full posterior distribution whereas AIC cannot because AIC conditions on a point estimate
 - WAIC works well with complex models (e.g. hierarchical) where the number of parameters increases with sample size
 - WAIC corrects the effective number of parameters to adjust for overfitting
+
 (Gelman et al., 2013)
 
 In a similar fashion as AIC, models with lower WAIC are better.
@@ -314,6 +291,7 @@ Gelman et al. (2016) also suggested Pareto-smoothed importance sampling LOO (PSI
 
 - PSIS-LOO is more robust in cases with weak priors and influential observations
 - PSIS-LOO and WAIC are asymptotically equivalent but WAIC may behave differently for small finite samples
+
 (Gelman et al., 2016)
 
 Again, in similar fashion to AIC and WAIC, models with lower LOOIC are better.
@@ -326,8 +304,6 @@ loo(extract_log_lik(bayesian.base_reg))$looic
 loo(extract_log_lik(bayesian.better_reg))$looic
 ```
 
-The result here agrees with AIC for the Frequentist models and WAIC for the Bayesian models.
-
 ## Model diagnostics
 
 ### Frequentist
@@ -335,9 +311,7 @@ The result here agrees with AIC for the Frequentist models and WAIC for the Baye
 To diagnose a Frequentist logistic regression model, we can check for linearity, outlier, and multicollinearithy assumption. Below we will demonstrate 2 of the 3 diagnostic assumptions.
 
 #### Outlier assumption
-
 \
-
 Frequentist logistic regression assumes that there are no outliers in the data. To test for this, we check if there are any data points that have a standardized residual larger than 3.
 
 ```{r}
@@ -348,30 +322,24 @@ nrow(model.data %>% filter(abs(.std.resid) > 3))
 As we can see, there is one outlier in our data. This violates the outlier assumption. Thus, we need to remove this observation and fit the regression model again.
 
 #### Multicollinearity/VIF
-
 \
-
-Frequentist logistic regression assumes that there is no multicolinearity in our data. To test for this, we check for any VIF values larger than 5.
-
-Looking at the output in Appendix A.2, we can see there is no VIF value larger than 5. The multicollinearity assumption is satisfied. This makes sense because we have eliminated some variables with high correlation previously.
+Frequentist logistic regression assumes that there is no multicolinearity in our data. To test for this, we check for any VIF values larger than 5. Looking at the output in Appendix A.2, we can see there is no VIF value larger than 5. The multicollinearity assumption is satisfied. This makes sense because we have eliminated some variables with high correlation previously.
 
 ### Bayesian
 
 To diagnose a Bayesian regression model, we can perform calibration analysis via cross-validation, prior predictive checks, MCMC diagnostics, etc. In general, there are more options in the Bayesian approach. Below we will demonstrate 2 diagnoses of the Bayesian workflow.
 
 #### Prior predictive checks
-
 \
-
-Prior predictive checks can help assess the fit of a Bayesian model by evaluating potential replications involving new parameters.
-
-Looking at figure in Appendix A.3, we can see that the distribution of the average outcome, $\bar{y}$, stays about the same as we increase the number of predictors. Whether this is desirable or not is up to the objective of the modeler. 
+Prior predictive checks can help assess the fit of a Bayesian model by evaluating potential replications involving new parameters. Looking at figure in Appendix A.3, we can see that the distribution of the average outcome, $\bar{y}$, stays about the same as we increase the number of predictors. Whether this is desirable or not is up to the objective of the modeler. 
 
 #### MCMC diagnostics
-
 \
-
 MCMC diagnostics can help test for the speed of convergence. The MCMC trace plot in Appendix A.4 does not show any major deviance between chains. The MCMC rank histogram in Appendix A.5 shows that all histograms are approximately uniform. Thus, we can see that this is a case of fast mixing.
+
+## Discussion
+
+The goals of the Frequentist and Bayesian approaches in our case are technically the same: fit a logistic regression model to the Breast Cancer Wisconsin dataset for inference and prediction. However, each approach has a different way of performing the regression fit, thus having different output. The Frequentists assume that the population is fixed with an unknown quantity/parameter. Thus, the Frequentists give you point estimates. The Bayesians treat the unknown probabilistiically and think the world can always change. Thus, the Bayesians give you distributions. Because of this difference, it is difficult to directly compare the Frequentist and Bayesian regression models. This is likely the biggest limitation in this project.
 
 \newpage
 
@@ -446,4 +414,104 @@ mcmc_trace(bayesian.better_reg, pars = c("b0")) + theme_minimal()
 
 ```{r}
 mcmc_rank_hist(bayesian.better_reg, pars = c("b0")) + theme_minimal()
+```
+
+### A.6 base_logistic.stan
+
+```
+data {
+  // train data
+  int<lower=0> N;
+  vector[N] x1;
+  vector[N] x2;
+  vector[N] x3;
+  vector[N] x4;
+  vector[N] x5;
+  vector[N] x6;
+  vector[N] x7;
+  vector[N] x8;
+  vector[N] x9;
+  vector[N] x10;
+  int<lower=0,upper=1> y[N];
+}
+
+parameters {
+  real b0;
+  real b1;
+  real b2;
+  real b3;
+  real b4;
+  real b5;
+  real b6;
+  real b7;
+  real b8;
+  real b9;
+  real b10;
+}
+
+model {
+  b0 ~ cauchy(0, 10);
+  b1 ~ cauchy(0, 2.5);
+  b2 ~ cauchy(0, 2.5);
+  b3 ~ cauchy(0, 2.5);
+  b4 ~ cauchy(0, 2.5);
+  b5 ~ cauchy(0, 2.5);
+  b6 ~ cauchy(0, 2.5);
+  b7 ~ cauchy(0, 2.5);
+  b8 ~ cauchy(0, 2.5);
+  b9 ~ cauchy(0, 2.5);
+  b10 ~ cauchy(0, 2.5);
+  y ~ bernoulli_logit(b0 + b1*x1 + b2*x2 + b3*x3 + b4*x4 + b5*x5 + b6*x6 + b7*x7 + b8*x8 + b9*x9 + b10*x10);
+}
+
+generated quantities {
+  vector[N] log_lik;
+  for (i in 1:N) {
+    log_lik[i] = bernoulli_logit_lpmf(y[i] | b0 + b1*x1[i] + b2*x2[i] + b3*x3[i] + b4*x4[i] + b5*x5[i] + b6*x6[i] + b7*x7[i] + b8*x8[i] + b9*x9[i] + b10*x10[i]);
+  }
+}
+```
+
+### A.7 better_logistic.stan
+
+```
+data {
+  // train data
+  int<lower=0> N;
+  vector[N] x1;
+  vector[N] x2;
+  vector[N] x5;
+  vector[N] x7;
+  vector[N] x9;
+  vector[N] x10;
+  int<lower=0,upper=1> y[N];
+}
+
+parameters {
+  real b0;
+  real b1;
+  real b2;
+  real b5;
+  real b7;
+  real b9;
+  real b10;
+}
+
+model {
+  b0 ~ cauchy(0, 10);
+  b1 ~ cauchy(0, 2.5);
+  b2 ~ cauchy(0, 2.5);
+  b5 ~ cauchy(0, 2.5);
+  b7 ~ cauchy(0, 2.5);
+  b9 ~ cauchy(0, 2.5);
+  b10 ~ cauchy(0, 2.5);
+  y ~ bernoulli_logit(b0 + b1*x1 + b2*x2 + b5*x5 + b7*x7 + b9*x9 + b10*x10);
+}
+
+generated quantities {
+  vector[N] log_lik;
+  for (i in 1:N) {
+    log_lik[i] = bernoulli_logit_lpmf(y[i] | b0 + b1*x1[i] + b2*x2[i] + b5*x5[i] + b7*x7[i] + b9*x9[i] + b10*x10[i]);
+  }
+}
 ```
