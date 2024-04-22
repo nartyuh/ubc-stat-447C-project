@@ -9,7 +9,7 @@ output:
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE, warning = FALSE)
+knitr::opts_chunk$set(echo = TRUE, message = FALSE ,warning = FALSE)
 library(tidyverse)
 library(loo)
 library(reshape2)
@@ -21,11 +21,19 @@ library(rstan)
 library(bayesplot)
 ```
 
+## GitHub
+
+https://github.com/nartyuh/ubc-stat-447C-project
+
 ## Introduction
 
-## Goals of the project
+Breast cancer is one the most common and malignant types of cancers. It is life-threatenting to many people around the world, especially women. There are many endeavours that motivate the research to find solutions for breast cancer treatment through the use of computational methods. The Breast Cancer Wisconsin is one of them. The challenge of this dataset is to develop inference and predictive analyses on 569 images of tumor cell nucleus obtained by Fine-Needle Aspiration. This can help with imaging analysis of cancerous cells and provide a tool for early detection.
 
-### Methodology
+## Purpose of the project
+
+The project conducts a comparison between the Frequentist and Bayesian approaches to logistic regression on the Breast Cancer Wisconsin dataset. We will first look at the perspectives of both approaches in terms of variable selection when there is multicollinearity among the explanatory variables. Then we examine how the Frequentist and the Bayesian approach model comparison. Finally, we will perform model diagnostics using each approach's respective methodologies.
+
+By making the comparison between Frequentist and Bayesian approaches, this project hopes to create a discourse around utilizing Bayesian approach for Breast Cancer Wisconsin.
 
 ## Data description
 
@@ -176,51 +184,57 @@ bayesian.base_reg <- sampling(
 
 ## Model with the exclusion of high correlated explanatory variables
 
-```{r, echo=FALSE}
-cor_mat <- round(cor(df[, 2:11]), 2)
-melted_cor_mat <- melt(cor_mat)
-ggplot(data = melted_cor_mat, aes(x=Var1, y=Var2, fill=value)) +
-  geom_tile() +
-  geom_text(aes(Var2, Var1, label = value), color = "black", size = 4) +
-  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1)) +
-  xlab("") + ylab("") + ggtitle("Correlation Matrix")
-```
+By looking at the correlation matrix of explanatory variables (Appendix A.1), we identify the following highly correlated features:
 
-Highly correlated variables:
+\begin{center}
+  \begin{tabular}{|c c|} 
+    \hline
+    Pair & Correlation \\
+    \hline\hline
+    radius and perimeter & 1 \\ 
+    \hline
+    radius and area & 0.99 \\
+    \hline
+    radius` and concave\_points & 0.82 \\
+    \hline
+    perimeter and area & 0.99 \\
+    \hline
+    perimeter and concave\_points & 0.85 \\
+    \hline
+    area and concave\_points & 0.82 \\
+    \hline
+    compactness and concavity & 0.88 \\
+    \hline
+    compactness and concave\_points & 0.83 \\
+    \hline
+    concavity and =concave\_points & 0.92 \\
+    \hline
+  \end{tabular}
+\end{center}
 
-- `radius` and `perimeter`: 1
-- `radius` and `area`: 0.99
-- `radius` and `concave_points`: 0.82
-- `perimeter` and `area`: 0.99
-- `perimeter` and `concavity`: 0.85
-- `perimeter` and `concave_points`: 0.71
-- `area` and `concave_points`: 0.82
-- `compactness` and `concavity`: 0.89
-- `compactness` and `concave_points`: 0.84
-- `concavity` and `concave_points`: 0.92
+The above explanatory variables exhibit multicollinearity. In regression analysis, this is undesirable because it undermines the statistical significance of an independent variable, thus leading to skewed or misleading results that can negatively impact a statistical inference task. (Understanding Regression Analysis, p. 176) To resolve this problem, we need to investigate into the source of the high correlation values and remove the collinear variables when it is reasonable to do so.
 
-The possible loss of precision when including unimportant predictors is usually viewed as a relatively small price to pay for the general validity of predictions and inferences about estimands of interest. (Bayesian Data Analysis, p. 367)
+- `perimeter` and `area` are highly correlated to `radius` and `concave_points`. This can be explained by the fact that both `radius` and `concave_points` determine the shape and outer structure of a cell nucleus so they will affect the calculation of `perimeter` and `area` to a certain proportional degree. Thus, we can exclude both `perimeter` and `area` from our list of features.
+- `compactness` is highly correlated with `concavity` and `concave_points`. `compactness` is calculated using $\frac{\text{perimeter}^2}{\text{area}} - 1$. As we have discussed above, `concavity` and `concave_points` could affect the calculation of `perimeter` and `area`. As a result, it is also likely that `compactness` can be explained by `concavity` and `concave_points`. Thus, we can exclude `compactness` from our list of features.
+- `concavity` and `concave_points` are highly correlated. `concavity` is the severity degree of concave portions, and `concave_points` is the number of concave points on a cell nucleus. Perhaps, they are proportional. Thus, we can exclude one of them from our list of features.
+
+Note that we are only considering correlation values that are above 0.8. In practice, this choice is subjective. We do not want to remove too many predictors, otherwise we might get undesirable results. It is reasonable to sacrifice small amount of precision by including unimportant predictors for the general validity of our regression model. (Bayesian Data Analysis, p. 367)
 
 ### Frequentist
 
 ```{r}
 frequentist.better_reg <- 
-  glm(Diagnosis ~ radius1 + texture1 + smoothness1 + concavity1 + symmetry1 + fractal_dimension1, data = df, family = binomial(link = "logit"))
+  glm(Diagnosis ~ radius1 + texture1 + smoothness1 + concavity1 + symmetry1 + 
+        fractal_dimension1, data = df, family = binomial(link = "logit"))
 ```
 
 ### Bayesian
 
-why colllinearity is bad in Bayesian
-The near-collinearity of the data means that the posterior variance of the regression coefficients would be high in this hypothetical case. Another problem in addition to increased uncertainty conditional on the regression model is that in practice the inferences would be highly sensitive to the model’s assumption that $E(y|x, \theta)$ is linear in x. (Bayesian Data Analysis, p. 366)
+It is well-known that multicollinearity is undesirable in Frequentist approach to regression analysis. Why is it also undesirable in Bayesian approach? Multicollinearity could lead to high posterior variance of the regression coefficients, thus increasing uncertainty. Additionally, it makes the inference task highly sensitive to the model's assumption that $E(y|x, \theta)$ is linear in x. (Bayesian Data Analysis, p. 366) Thus, Bayesian approach could also benefit from the removal of multicollinear explanatory variables.
 
 \begin{align}
   \beta_0 & \sim \text{Cauchy}(0, 10) \\
-  \beta_1 & \sim \text{Cauchy}(0, 2.5) \\
-  \beta_2 & \sim \text{Cauchy}(0, 2.5) \\
-  \beta_5 & \sim \text{Cauchy}(0, 2.5) \\
-  \beta_7 & \sim \text{Cauchy}(0, 2.5) \\
-  \beta_9 & \sim \text{Cauchy}(0, 2.5) \\
-  \beta_10 & \sim \text{Cauchy}(0, 2.5) \\
+  \beta_i & \overset{\text{iid}}{\sim} \text{Cauchy}(0, 2.5) & i \in {1,2,5,7,9,10} \\
   y_n|\beta & \sim \text{Bern}(\text{logistic}(\beta_0 + \beta_1x_{n,1} + \beta_2x_{n,2} + \beta_5x_{n,5} + \beta_7x_{n,7} + \beta_9x_{n,9} + \beta_{10}x_{n,10})) & n \in \{1,...,n_\text{obs}\}
 \end{align}
 
@@ -259,6 +273,8 @@ bayesian.better_reg <- sampling(
 
 ### Frequentist
 
+In the Frequentist approach, we often use Akaike information criterion (AIC) to compare different models on the same dataset. Models with lower AIC are better.
+
 ```{r}
 AIC(frequentist.base_reg)
 ```
@@ -267,11 +283,20 @@ AIC(frequentist.base_reg)
 AIC(frequentist.better_reg)
 ```
 
+We can see that the AIC for our base model is lower than the one for our model with variable exclusion in the Frequentist approach. Even though the difference is not huge, it provides us insight into our analysis. The lower AIC for base model could imply that we might have removed too many predictors or important ones. With this information, we can adjust our variable selection.
+
 ### Bayesian
 
 #### WAIC
-
 \
+AIC works really well in the Frequentist approach. However, it is not a preferable method of model comparison in Bayesian approach. Gelman et al. (2013) suggested that we use Watanabe-Akaike information criteria (WAIC) when comparing Bayesian models for the following reasons:
+
+- WAIC can utilize the full posterior distribution whereas AIC cannot because AIC conditions on a point estimate
+- WAIC works well with complex models (e.g. hierarchical) where the number of parameters increases with sample size
+- WAIC corrects the effective number of parameters to adjust for overfitting
+(Gelman et al., 2013)
+
+In a similar fashion as AIC, models with lower WAIC are better.
 
 ```{r}
 waic(extract_log_lik(bayesian.base_reg))$waic
@@ -281,9 +306,17 @@ waic(extract_log_lik(bayesian.base_reg))$waic
 waic(extract_log_lik(bayesian.better_reg))$waic
 ```
 
-#### LOOIC
+Similar to the result of AIC for the Frequentist models, the base model has slightly lower WAIC than the model with variable exclusion. The implication is also similar to the Frequentist approach.
 
+#### PSIS-LOO
 \
+Gelman et al. (2016) also suggested Pareto-smoothed importance sampling LOO (PSIS-LOO), or LOOIC, over WAIC for the following reasons:
+
+- PSIS-LOO is more robust in cases with weak priors and influential observations
+- PSIS-LOO and WAIC are asymptotically equivalent but WAIC may behave differently for small finite samples
+(Gelman et al., 2016)
+
+Again, in similar fashion to AIC and WAIC, models with lower LOOIC are better.
 
 ```{r}
 loo(extract_log_lik(bayesian.base_reg))$looic
@@ -293,32 +326,90 @@ loo(extract_log_lik(bayesian.base_reg))$looic
 loo(extract_log_lik(bayesian.better_reg))$looic
 ```
 
+The result here agrees with AIC for the Frequentist models and WAIC for the Bayesian models.
+
 ## Model diagnostics
 
 ### Frequentist
 
-Lineairty assumption
+To diagnose a Frequentist logistic regression model, we can check for linearity, outlier, and multicollinearithy assumption. Below we will demonstrate 2 of the 3 diagnostic assumptions.
 
-Influential outliers
+#### Outlier assumption
+
+\
+
+Frequentist logistic regression assumes that there are no outliers in the data. To test for this, we check if there are any data points that have a standardized residual larger than 3.
 
 ```{r}
 model.data <- augment(frequentist.better_reg) %>% mutate(index = 1:n()) 
-model.data %>% filter(abs(.std.resid) > 3)
+nrow(model.data %>% filter(abs(.std.resid) > 3))
 ```
 
-Multicollinearity/VIF
+As we can see, there is one outlier in our data. This violates the outlier assumption. Thus, we need to remove this observation and fit the regression model again.
 
-```{r}
-VIF(frequentist.better_reg)
-```
+#### Multicollinearity/VIF
+
+\
+
+Frequentist logistic regression assumes that there is no multicolinearity in our data. To test for this, we check for any VIF values larger than 5.
+
+Looking at the output in Appendix A.2, we can see there is no VIF value larger than 5. The multicollinearity assumption is satisfied. This makes sense because we have eliminated some variables with high correlation previously.
 
 ### Bayesian
+
+To diagnose a Bayesian regression model, we can perform calibration analysis via cross-validation, prior predictive checks, MCMC diagnostics, etc. In general, there are more options in the Bayesian approach. Below we will demonstrate 2 diagnoses of the Bayesian workflow.
 
 #### Prior predictive checks
 
 \
 
-```{r, include=FALSE}
+Prior predictive checks can help assess the fit of a Bayesian model by evaluating potential replications involving new parameters.
+
+Looking at figure in Appendix A.3, we can see that the distribution of the average outcome, $\bar{y}$, stays about the same as we increase the number of predictors. Whether this is desirable or not is up to the objective of the modeler. 
+
+#### MCMC diagnostics
+
+\
+
+MCMC diagnostics can help test for the speed of convergence. The MCMC trace plot in Appendix A.4 does not show any major deviance between chains. The MCMC rank histogram in Appendix A.5 shows that all histograms are approximately uniform. Thus, we can see that this is a case of fast mixing.
+
+\newpage
+
+## Reference
+
+Allen, M. P. (1997). Understanding regression analysis. Plenum Press.
+
+Gelman, A., Carlin, J. B., Stern, H. S., & Dunson, D. B. (2013). Bayesian data analysis. Chapman and Hall/CRC.
+
+Gelman, A., Jakulin, A., Pittau, M. G., & Su, Y.-S. (2008). A Weakly Informative Default Prior Distribution for Logistic and Other Regression Models. The Annals of Applied Statistics, 2(4), 1360–1383. http://www.jstor.org/stable/30245139
+
+Gelman, A., Hwang, J. & Vehtari, A. Understanding predictive information criteria for Bayesian models. Stat Comput 24, 997–1016 (2013). https://doi.org/10.1007/s11222-013-9416-2
+
+Vehtari, A., Gelman, A. & Gabry, J. Practical Bayesian model evaluation using leave-one-out cross-validation and WAIC. Stat Comput 27, 1413–1432 (2017). https://doi.org/10.1007/s11222-016-9696-4
+
+## A. Appendix
+
+### A.1 Correlation matrix of explanatory variables
+
+```{r}
+cor_mat <- round(cor(df[, 2:11]), 2)
+melted_cor_mat <- melt(cor_mat)
+ggplot(data = melted_cor_mat, aes(x=Var1, y=Var2, fill=value)) +
+  geom_tile() +
+  geom_text(aes(Var2, Var1, label = value), color = "black", size = 4) +
+  theme(axis.text.x = element_text(angle = 60, vjust = 1, hjust=1)) +
+  xlab("") + ylab("") + ggtitle("Correlation Matrix")
+```
+
+### A.2 VIF for Frequentist model with variable exclusion
+
+```{r}
+VIF(frequentist.better_reg)
+```
+
+### A.3 Prior predictive checks
+
+```{r}
 suppressPackageStartupMessages(library(extraDistr))
 ```
 
@@ -345,21 +436,14 @@ for(n_pred in c(2,4,15)) {
 }
 ```
 
-
-
-#### MCMC diagnostics
-
-\
+### A.4 MCMC trace plot
 
 ```{r}
 mcmc_trace(bayesian.better_reg, pars = c("b0")) + theme_minimal()
 ```
 
+### A.5 MCMC rank histogram
+
 ```{r}
 mcmc_rank_hist(bayesian.better_reg, pars = c("b0")) + theme_minimal()
 ```
-
-## Direct comparison between Frequentist and Bayesian
-
-## Appendix
-
